@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Total Coliforms Grouped Bar Chart</title>
+    <!-- Add D3.js library -->
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+
+        #barChart {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        text {
+            font-size: 12px;
+        }
+
+        .legend {
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Total Coliforms Grouped Bar Chart</h1>
+
+    <!-- Input to choose CSV file -->
+    <input type="file" id="csvFile" accept=".csv">
+
+    <!-- Container for the bar graph -->
+    <div id="barChart"></div>
+
+    <script>
+        document.getElementById('csvFile').addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+
+                reader.onload = function (e) {
+                    const csvContent = e.target.result;
+                    const data = parseCSV(csvContent);
+                    createGroupedBarGraph(data);
+                };
+
+                reader.readAsText(file);
+            }
+        }
+
+        function parseCSV(csvContent) {
+            const lines = csvContent.split('\n');
+            const headers = lines[0].split(',');
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+
+                // Trim values to remove leading/trailing spaces or other non-visible characters
+                const trimmedValues = values.map(value => value.trim());
+
+                // Check if the trimmed values array has the expected length
+                if (trimmedValues.length === headers.length) {
+                    const entry = {};
+
+                    for (let j = 0; j < headers.length; j++) {
+                        entry[headers[j].trim()] = trimmedValues[j];
+                    }
+
+                    data.push(entry);
+                } else {
+
+                }
+            }
+
+            return data;
+        }
+
+        function createGroupedBarGraph(data) {
+            // Filter data for 'Measure' of total coliforms
+            const totalColiformsData = data.filter(entry => entry.measure === 'Total coliforms');
+
+            // Use D3 to create a grouped bar graph
+            const svgWidth = 800;
+            const svgHeight = 400;
+            const margin = { top: 50, right: 100, bottom: 50, left: 50 };
+
+            // Extract unique years and locations
+            const uniqueYears = [...new Set(totalColiformsData.map(entry => new Date(entry['sample date']).getFullYear()))];
+            const uniqueLocations = [...new Set(totalColiformsData.map(entry => entry.location))];
+            const xScale = d3.scaleBand().domain(uniqueYears.map(String)).range([0, svgWidth - margin.right]).padding(0.1);
+            const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(uniqueLocations);
+
+            const svg = d3.select('#barChart')
+                .append('svg')
+                .attr('width', svgWidth)
+                .attr('height', svgHeight);
+
+
+            // Add x-axis label
+            svg.append('text')
+                .attr('x', svgWidth / 2)
+                .attr('y', svgHeight - margin.bottom + 50)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '12px')
+                .text('Year');
+
+            // Add y-axis label
+            svg.append('text')
+                .attr('transform', 'rotate(-90)')
+                .attr('x', -svgHeight / 2)
+                .attr('y', 10)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '12px')
+                .text('Coliform Count');
+
+            const group = svg.selectAll('g')
+                .data(totalColiformsData)
+                .enter()
+                .append('g')
+                .attr('transform', d => `translate(${xScale(new Date(d['sample date']).getFullYear())}, 0)`);
+
+            group.selectAll('rect')
+                .data(d => [d]) // Bind each location to a separate rect
+                .enter()
+                .append('rect')
+                .attr('x', (d, i) => xScale.bandwidth() / uniqueLocations.length * i)
+                .attr('y', d => svgHeight - margin.bottom - parseInt(d.value, 10))
+                .attr('width', xScale.bandwidth() / uniqueLocations.length)
+                .attr('height', d => parseInt(d.value, 10))
+                .attr('fill', d => colorScale(d.location))
+                // Add tooltip
+                .append('title')
+                .text(d => `Year: ${new Date(d['sample date']).getFullYear()}\nLocation: ${d.location}\nColiform Count: ${d.value}`);
+
+            // Add text labels for the year on the x-axis
+            group.append('text')
+                .attr('x', xScale.bandwidth() / 10)
+                .attr('y', svgHeight - margin.bottom / 3)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '10px')
+                .text(d => new Date(d['sample date']).getFullYear());
+
+
+            // Add legend
+            const legend = svg.selectAll('.legend')
+                .data(uniqueLocations)
+                .enter()
+                .append('g')
+                .attr('class', 'legend')
+                .attr('transform', (d, i) => `translate(${svgWidth - margin.right + 10},${i * 20})`);
+
+            legend.append('rect')
+                .attr('width', 18)
+                .attr('height', 18)
+                .style('fill', colorScale);
+
+            legend.append('text')
+                .attr('x', 24)
+                .attr('y', 9)
+                .attr('dy', '.35em')
+                .style('text-anchor', 'start')
+                .text(d => d);
+        }
+    </script>
+
+</body>
+
+</html>
